@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "@atproto/api": "^0.13.16",
+    "axios": "^1.7.7",
+    "cheerio": "^1.0.0",
+    "cron": "^3.2.1",
+    "dotenv": "^16.4.5",
+    "html-entities": "^2.5.2",
+    "process": "^0.11.10",
+    "rss-parser": "^3.13.0",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0"
+  }
+}

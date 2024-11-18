@@ -1,0 +1,7 @@
+# Ignore .env, posted_items.json
+.env
+posted_items.json
+# Node Modules
+node_modules
+# JS
+*.js
