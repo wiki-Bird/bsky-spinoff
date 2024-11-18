@@ -61,6 +61,7 @@ function getRandomInterval(): number {
     const minMinutes = 30;
     const maxMinutes = 60;
     return Math.floor(Math.random() * (maxMinutes - minMinutes + 1) + minMinutes) * 60 * 1000;
+    // return 0;
 }
 
 function truncateTitle(title: string, urlLength: number): string {
@@ -167,7 +168,7 @@ async function postToBluesky(title: string, url: string, thumb: BlobRefCustom) {
         // Create the post with title and URL on separate lines
         const postText = `${processedTitle}`;
 
-        const cardTitle = `The Spinoff | ${processedTitle}`;
+        const cardTitle = `The Spinoff → ${processedTitle}`;
 
         console.log('Processed title:', processedTitle);
         
@@ -219,7 +220,6 @@ async function processRSSFeed() {
         }
 
         postedItems.lastFetchTime = currentTime;
-        await savePostedItems(postedItems);
 
         const feed = await parser.parseURL(process.env.RSS_FEED_URL!);
         
@@ -317,7 +317,7 @@ async function main() {
     
     // Schedule regular checks every 15 minutes
     const job = new CronJob(
-        '*/15 * * * *',
+        '*/2 * * * *',
         processRSSFeed,
         null,
         true,
