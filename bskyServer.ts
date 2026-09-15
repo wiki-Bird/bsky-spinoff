@@ -184,16 +184,14 @@ async function postToBluesky(
     const processedTitle = truncateTitle(title, url.length);
 
     const postText = `${metaDescription}`;
-    let postDescription = "";
-    if (metaDescription.length >= 149) {
-      postDescription = metaDescription.substring(0, 149).trim();
+    let postDescription = metaDescription.trim();
+
+    if (postDescription.length >= 149) {
+      postDescription = postDescription.substring(0, 149);
       if ( postDescription.at(-1) !== "." ) {
         postDescription += "..."
       }
     }
-    else {
-      postDescription = metaDescription.trim();
-		}
 
     // const cardTitle = `The Spinoff → ${processedTitle}`; // No longer used in this format
 
@@ -351,8 +349,15 @@ async function main() {
   // Run first time
   await processRSSFeed();
 
-  // Check every 15 mins
-  const job = new CronJob("*/15 * * * *", processRSSFeed, null, true, "UTC");
+  // Check every 15 mins between the hours of 6am & 5pm
+  // const job = new CronJob("*/15 * * * *", processRSSFeed, null, true, "UTC");
+  const job = new CronJob(
+    "*/15 6-17 * * *",
+    processRSSFeed,
+    null,
+    true,
+    "Pacific/Auckland"
+  );
 
   job.start();
 }
