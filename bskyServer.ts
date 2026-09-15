@@ -66,9 +66,10 @@ function getRandomInterval(): number {
   );
 }
 
+// Depreciated:
 function truncateTitle(title: string, urlLength: number): string {
   // Calculate maximum title length (300 - URL length - 2 newlines - 2 dots)
-  const maxLength = 300 - urlLength - 2 - 2;
+  const maxLength = 300 - 2 - 2;
 
   const decodedTitle = decode(title.replace(/<[^>]*>/g, "").trim());
 
@@ -187,7 +188,7 @@ async function postToBluesky(
     console.log("Posting:", title);
     console.log("URL:", url);
 
-    const processedTitle = truncateTitle(title, url.length);
+    const processedTitle = title;
     let postDescription = metaDescription.trim();
 
     if (postDescription.length >= 149) {
@@ -261,7 +262,7 @@ async function processRSSFeed() {
       return;
     }
 
-    const latestItems = feed.items.slice(0, 8);
+    const latestItems = feed.items.slice(0, 12);
 
     // Process feed items - we want title and link
     for (const entry of latestItems) {
