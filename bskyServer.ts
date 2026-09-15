@@ -319,13 +319,13 @@ async function processRSSFeed() {
 
       console.log("Processing item:", title);
 
-      // Post to Bluesky with the thumb if available
+      // Post to Bsky
       await postToBluesky(title, url, thumb!, metaDescription);
       postedItems.guids.push(guid);
       await savePostedItems(postedItems);
 
-      // Random delay between posts (2-5 minutes)
-      const delay = Math.floor(Math.random() * (5 - 2 + 1) + 2) * 60 * 1000;
+      // Random delay between posts (5-15 minutes)
+      const delay = Math.floor(Math.random() * (15 - 5 + 1) + 5) * 60 * 1000;
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
