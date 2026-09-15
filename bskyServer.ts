@@ -187,7 +187,7 @@ async function postToBluesky(
     let postDescription = metaDescription.trim();
 
     if (postDescription.length >= 149) {
-      postDescription = postDescription.substring(0, 149);
+      postDescription = postDescription.substring(0, 149).trim();
       if ( postDescription.at(-1) !== "." ) {
         postDescription += "..."
       }
