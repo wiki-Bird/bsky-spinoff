@@ -184,7 +184,16 @@ async function postToBluesky(
     const processedTitle = truncateTitle(title, url.length);
 
     const postText = `${metaDescription}`;
-    const postDescription = metaDescription.substring(0, 290).trim() + "...";
+    let postDescription = "";
+    if (metaDescription.length >= 149) {
+      postDescription = metaDescription.substring(0, 149).trim();
+      if ( postDescription.at(-1) !== "." ) {
+        postDescription += "..."
+      }
+    }
+    else {
+      postDescription = metaDescription.trim();
+		}
 
     // const cardTitle = `The Spinoff → ${processedTitle}`; // No longer used in this format
 
