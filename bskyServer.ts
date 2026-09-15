@@ -48,12 +48,14 @@ const agent = new AtpAgent({
 });
 
 const CACHE_FILE = "posted_items.json";
+const minFetchInterval = 15 * 60 * 1000;
 
 interface PostedItems {
   guids: string[];
   lastFetchTime: number;
 }
 
+// Deprecated:
 function getRandomInterval(): number {
   const minMinutes = 30;
   const maxMinutes = 120;
@@ -62,7 +64,6 @@ function getRandomInterval(): number {
     60 *
     1000
   );
-  // return 0;
 }
 
 function truncateTitle(title: string, urlLength: number): string {
@@ -102,21 +103,26 @@ async function downloadAndProcessImage(
 
     // max post size is 1mb, so image should be less than 1mb with room for other data
     const maxImageSize = 900000; // 900kb
-
-    // loop until image is less than 900kb by reducing quality, with a minimum of 40 quality
-    let processedImage = response.data;
     let quality = 100;
-    while (processedImage.length > maxImageSize && quality > 40) {
-      quality -= 5;
-      processedImage = await sharp(response.data)
-        .resize(1000, 1000, {
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .png({ quality })
-        .toBuffer();
+    let processedImage = await sharp(response.data)
+      .resize(1000, 1000, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality })
+      .toBuffer();
 
-      console.log("Image processed with quality:", quality);
+    while (processedImage.length > maxImageSize && quality >= 10) {
+      quality -= 15;
+      processedImage = await sharp(response.data)
+          .resize(1000, 1000, {
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .webp({ quality })
+          .toBuffer();
+
+        console.log("Image processed with quality:", quality);
     }
 
     return processedImage;
@@ -137,7 +143,7 @@ async function uploadImageToBluesky(
 
     try {
       uploadResponse = await agent.uploadBlob(imageBuffer, {
-        encoding: "image/png",
+        encoding: "image/webp",
       });
     } catch (error) {
       console.log(
@@ -148,7 +154,7 @@ async function uploadImageToBluesky(
         password: process.env.BLUESKY_PASSWORD!,
       });
       uploadResponse = await agent.uploadBlob(imageBuffer, {
-        encoding: "image/png",
+        encoding: "image/webp",
       });
     }
 
@@ -157,7 +163,7 @@ async function uploadImageToBluesky(
       ref: {
         $link: uploadResponse.data.blob.ref.toString(),
       },
-      mimeType: "image/png",
+      mimeType: "image/webp",
       size: imageBuffer.length,
     };
   } catch (error) {
@@ -182,8 +188,6 @@ async function postToBluesky(
     console.log("URL:", url);
 
     const processedTitle = truncateTitle(title, url.length);
-
-    const postText = `${metaDescription}`;
     let postDescription = metaDescription.trim();
 
     if (postDescription.length >= 149) {
@@ -224,7 +228,7 @@ async function postToBluesky(
         password: process.env.BLUESKY_PASSWORD!,
       });
       await agent.post({
-        text: postText,
+        text: processedTitle,
         embed: embed,
       });
     }
@@ -232,6 +236,7 @@ async function postToBluesky(
     console.log("Posted successfully:", processedTitle);
   } catch (error) {
     console.error("Error posting to Bluesky:", error);
+
   }
 }
 
@@ -240,11 +245,10 @@ async function processRSSFeed() {
     const postedItems = await loadPostedItems();
     const currentTime = Date.now();
 
-    if (currentTime - postedItems.lastFetchTime < getRandomInterval()) {
+    if (currentTime - postedItems.lastFetchTime < minFetchInterval) {
       console.log("Skipping feed fetch - too soon since last check");
       return;
     }
-
     postedItems.lastFetchTime = currentTime;
 
     const feed = await parser.parseURL(process.env.RSS_FEED_URL!);
@@ -264,7 +268,7 @@ async function processRSSFeed() {
       const guid = entry.id;
       const title = entry.title;
       const url = entry.link;
-      var metaDescription = title.slice(0, 290);
+      let metaDescription = title.slice(0, 290);
 
       // If already posted
       if (postedItems.guids.includes(guid)) {
