@@ -49,6 +49,7 @@ const agent = new AtpAgent({
 
 const CACHE_FILE = "posted_items.json";
 const minFetchInterval = 15 * 60 * 1000;
+let isProcessing = false;
 
 interface PostedItems {
   guids: string[];
@@ -243,105 +244,119 @@ async function postToBluesky(
 
 async function processRSSFeed() {
   try {
-    const postedItems = await loadPostedItems();
-    const currentTime = Date.now();
-
-    if (currentTime - postedItems.lastFetchTime < minFetchInterval) {
-      console.log("Skipping feed fetch - too soon since last check");
+    if (isProcessing) {
+      console.log("Skipping RSS fetch; still processing last run");
       return;
     }
-    postedItems.lastFetchTime = currentTime;
+    isProcessing = true;
 
-    const feed = await parser.parseURL(process.env.RSS_FEED_URL!);
+    try {
+      const postedItems = await loadPostedItems();
+      const currentTime = Date.now();
 
-    console.log("Feed parsed successfully");
-    console.log("Number of entries:", feed.items?.length || 0);
+      if (currentTime - postedItems.lastFetchTime < minFetchInterval) {
+        console.log("Skipping feed fetch - too soon since last check");
+        return;
+      }
+      postedItems.lastFetchTime = currentTime;
 
-    if (!feed.items) {
-      console.error("Feed items not found");
-      return;
-    }
+      const feed = await parser.parseURL(process.env.RSS_FEED_URL!);
 
-    const latestItems = feed.items.slice(0, 12);
+      console.log("Feed parsed successfully");
+      console.log("Number of entries:", feed.items?.length || 0);
 
-    // Process feed items - we want title and link
-    for (const entry of latestItems) {
-      const guid = entry.id;
-      const title = entry.title;
-      const url = entry.link;
-      let metaDescription = title.slice(0, 290);
-
-      // If already posted
-      if (postedItems.guids.includes(guid)) {
-        console.log("Skipping already posted item:", title);
-        continue;
+      if (!feed.items) {
+        console.error("Feed items not found");
+        return;
       }
 
-      // Find and process image
-      let thumb;
-      try {
-        const response = await axios.get(url);
-        const $ = cheerio.load(response.data);
+      const latestItems = feed.items.slice(0, 12);
 
-        metaDescription =
-          $('meta[property="og:description"]').attr("content") ||
-          title.slice(0, 290);
+      // Process feed items - we want title and link
+      for (const entry of latestItems) {
+        const guid = entry.id;
+        const title = entry.title;
+        const url = entry.link;
+        let metaDescription = title.slice(0, 290);
 
-        var imageUrl =
-          $('meta[property="og:image"]').attr("content") ||
-          $('meta[name="twitter:image"]').attr("content") ||
-          $("article img").first().attr("src") ||
-          $("main img").first().attr("src") ||
-          $(".post-content img").first().attr("src");
-
-        // if no image found, use default image
-        if (!imageUrl) {
-          imageUrl =
-            "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:3hq7i54gjltbsl3pt5d37s3a/bafkreiczlei3r5fzmie2fwlsfgyzmotx4c4gho25rt6qoya76z3sfiudme@jpeg";
+        // If already posted
+        if (postedItems.guids.includes(guid)) {
+          console.log("Skipping already posted item:", title);
+          continue;
         }
 
-        if (imageUrl) {
-          // Handle relative URLs
-          const fullImageUrl = imageUrl.startsWith("http")
-            ? imageUrl
-            : new URL(imageUrl, url).toString();
+        // Find and process image
+        let thumb;
+        try {
+          const response = await axios.get(url);
+          const $ = cheerio.load(response.data);
 
-          console.log("Full image URL:", fullImageUrl);
+          metaDescription =
+            $('meta[property="og:description"]').attr("content") ||
+            title.slice(0, 290);
 
-          // Download and process the image
-          const imageBuffer = await downloadAndProcessImage(fullImageUrl);
+          var imageUrl =
+            $('meta[property="og:image"]').attr("content") ||
+            $('meta[name="twitter:image"]').attr("content") ||
+            $("article img").first().attr("src") ||
+            $("main img").first().attr("src") ||
+            $(".post-content img").first().attr("src");
 
-          if (imageBuffer) {
-            // Upload to Bluesky and get blob reference
-            console.log("imageBuffer:", imageBuffer);
-            thumb = await uploadImageToBluesky(agent, imageBuffer);
-            console.log("Thumb:", thumb);
+          // if no image found, use default image
+          if (!imageUrl) {
+            imageUrl =
+              "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:3hq7i54gjltbsl3pt5d37s3a/bafkreiczlei3r5fzmie2fwlsfgyzmotx4c4gho25rt6qoya76z3sfiudme@jpeg";
           }
+
+          if (imageUrl) {
+            // Handle relative URLs
+            const fullImageUrl = imageUrl.startsWith("http")
+              ? imageUrl
+              : new URL(imageUrl, url).toString();
+
+            console.log("Full image URL:", fullImageUrl);
+
+            // Download and process the image
+            const imageBuffer = await downloadAndProcessImage(fullImageUrl);
+
+            if (imageBuffer) {
+              // Upload to Bluesky and get blob reference
+              console.log("imageBuffer:", imageBuffer);
+              thumb = await uploadImageToBluesky(agent, imageBuffer);
+              console.log("Thumb:", thumb);
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing image for ${url}:`, error);
         }
-      } catch (error) {
-        console.error(`Error processing image for ${url}:`, error);
+
+        console.log("Processing item:", title);
+
+        // Post to Bsky
+        await postToBluesky(title, url, thumb!, metaDescription);
+        postedItems.guids.push(guid);
+        await savePostedItems(postedItems);
+
+        // Random delay between posts (5-15 minutes)
+        const delay = Math.floor(Math.random() * (15 - 5 + 1) + 5) * 60 * 1000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      console.log("Processing item:", title);
-
-      // Post to Bsky
-      await postToBluesky(title, url, thumb!, metaDescription);
-      postedItems.guids.push(guid);
       await savePostedItems(postedItems);
+    } catch (error) {
+      console.error("Error processing RSS feed:", error);
 
-      // Random delay between posts (5-15 minutes)
-      const delay = Math.floor(Math.random() * (15 - 5 + 1) + 5) * 60 * 1000;
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+        console.error("Stack trace:", error.stack);
+      }
     }
-
-    await savePostedItems(postedItems);
-  } catch (error) {
-    console.error("Error processing RSS feed:", error);
-
-    if (error instanceof Error) {
-      console.error("Error details:", error.message);
-      console.error("Stack trace:", error.stack);
-    }
+  }
+  catch(error) {
+    console.error("Error processing RSS feed: ", error)
+  }
+  finally {
+    isProcessing = false;
   }
 }
 
