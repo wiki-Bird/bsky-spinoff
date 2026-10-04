@@ -243,11 +243,12 @@ async function postToBluesky(
 }
 
 async function processRSSFeed() {
+  if (isProcessing) {
+    console.log("Skipping RSS fetch; still processing last run");
+    return;
+  }
+
   try {
-    if (isProcessing) {
-      console.log("Skipping RSS fetch; still processing last run");
-      return;
-    }
     isProcessing = true;
 
     try {
