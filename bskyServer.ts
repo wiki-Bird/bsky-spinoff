@@ -68,18 +68,18 @@ function getRandomInterval(): number {
 }
 
 // Depreciated:
-function truncateTitle(title: string, urlLength: number): string {
-  // Calculate maximum title length (300 - URL length - 2 newlines - 2 dots)
-  const maxLength = 300 - 2 - 2;
-
-  const decodedTitle = decode(title.replace(/<[^>]*>/g, "").trim());
-
-  if (decodedTitle.length <= maxLength) {
-    return decodedTitle;
-  }
-
-  return decodedTitle.substring(0, maxLength).trim() + ".."; // one . is added either by bsky or spinoff
-}
+// function truncateTitle(title: string, urlLength: number): string {
+//   // Calculate maximum title length (300 - URL length - 2 newlines - 2 dots)
+//   const maxLength = 300 - 2 - 2;
+//
+//   const decodedTitle = decode(title.replace(/<[^>]*>/g, "").trim());
+//
+//   if (decodedTitle.length <= maxLength) {
+//     return decodedTitle;
+//   }
+//
+//   return decodedTitle.substring(0, maxLength).trim() + ".."; // one . is added either by bsky or spinoff
+// }
 
 async function loadPostedItems(): Promise<PostedItems> {
   try {
@@ -189,7 +189,8 @@ async function postToBluesky(
     console.log("Posting:", title);
     console.log("URL:", url);
 
-    const processedTitle = title;
+    const processedTitle = title.replace(/&#39;/g, "'");
+
     let postDescription = metaDescription.trim();
 
     if (postDescription.length >= 149) {
