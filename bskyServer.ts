@@ -209,7 +209,7 @@ async function postToBluesky(
       $type: "app.bsky.embed.external",
       external: {
         uri: url,
-        title: title,
+        title: processedTitle,
         description: postDescription,
         ...(thumb && { thumb }),
       },
